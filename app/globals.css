@@ -12,3 +12,9 @@ html {
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* Scanning indicator shown while a try-on image is generating. */
+@keyframes tryOnScan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
