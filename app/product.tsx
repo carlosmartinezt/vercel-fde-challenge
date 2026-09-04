@@ -4,7 +4,6 @@ import type { Product } from '@/lib/api'
 import Image from 'next/image'
 import * as React from 'react'
 import { generateTryOn } from './actions'
-import { getVariant, type Variant } from './variant'
 import { useTryOn } from './try-on-context'
 
 type TryOnState
@@ -12,22 +11,13 @@ type TryOnState
     | { status: 'ready', image: string }
     | { status: 'error', error: string }
 
-export default function ProductPage({ product, index }: { product: Product, index: number }) {
-  /**
-   * The copy experiment. Starts on `default` so the prerendered HTML carries
-   * the real product name rather than a placeholder, then swaps to the
-   * visitor's assigned variant after mount. Control-group visitors never see
-   * it change, and the server and first client render agree, so there is no
-   * hydration mismatch.
-   */
-  const [variant, setVariant] = React.useState<Variant>('default')
-
-  React.useEffect(() => {
-    setVariant(getVariant())
-  }, [])
-
-  const title = product.title[variant]
-
+/**
+ * The title arrives already resolved to this visitor's experiment bucket,
+ * chosen in proxy.ts and baked into the prerendered page. Nothing about the
+ * copy is decided in the browser, so it is in the HTML for crawlers and there
+ * is nothing to swap after hydration.
+ */
+export default function ProductPage({ product, index, title }: { product: Product, index: number, title: string }) {
   const { photo } = useTryOn()
 
   // Keyed by photo id so a new upload resets to the loading state without an
