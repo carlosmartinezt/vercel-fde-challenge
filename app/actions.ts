@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
-import { generateImage } from 'ai'
+import { generateText } from 'ai'
 import data from '../public/data.json'
 
 /**
@@ -88,16 +88,53 @@ async function tryOn(photo: string, productId: string): Promise<TryOnResult> {
 
   const garment = await readProductImage(product.image)
 
-  const { image } = await generateImage({
+  /**
+   * `generateText`, not `generateImage`. The Gateway classifies
+   * gemini-2.5-flash-image-preview as a *language* model that happens to emit
+   * images, so the image API rejects it outright ("is a language model, not an
+   * image model"). Multi-modal output arrives on `result.files`.
+   */
+  const result = await generateText({
     model: MODEL,
-    prompt: {
-      images: [person.base64, garment.toString('base64')],
-      text: prompt(product.title.default),
-    },
-    aspectRatio: '1:1',
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt(product.title.default) },
+        { type: 'image', image: person.base64, mediaType: person.mediaType },
+        { type: 'image', image: garment, mediaType: mediaTypeOf(product.image) },
+      ],
+    }],
   })
 
-  return { ok: true, image: `data:${image.mediaType};base64,${image.base64}` }
+  const image = result.files?.find(file => file.mediaType.startsWith('image/'))
+
+  if (!image) {
+    // The model answered in words instead of pixels, which it does when it
+    // objects to the request. Its own sentence is more useful than ours.
+    const said = result.text.trim().split('\n')[0]
+    return { ok: false, error: said || 'The model did not return an image.' }
+  }
+
+  // `base64` is documented as a data URL on some providers and raw base64 on
+  // others. Accept either rather than emitting `data:image/png;base64,data:...`.
+  return {
+    ok: true,
+    image: image.base64.startsWith('data:')
+      ? image.base64
+      : `data:${image.mediaType};base64,${image.base64}`,
+  }
+}
+
+/** Product images are static files in public/, so the extension is the truth. */
+function mediaTypeOf(image: string): string {
+  const extension = path.extname(image).toLowerCase()
+
+  if (extension === '.png')
+    return 'image/png'
+  if (extension === '.webp')
+    return 'image/webp'
+
+  return 'image/jpeg'
 }
 
 export async function generateTryOn(photo: string, productId: string): Promise<TryOnResult> {
