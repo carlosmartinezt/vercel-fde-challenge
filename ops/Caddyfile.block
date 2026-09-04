@@ -1,0 +1,31 @@
+# Vercel FDE challenge storefront.
+# Service: systemd *user* unit `fde-challenge` on 127.0.0.1:3060.
+# (3060 is the port the retired cvchat unit used to hold.)
+#
+# Append this block to /etc/caddy/Caddyfile, then:
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+fde-challenge.carlosmartinezt.com {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/fde-challenge-access.log {
+            roll_size 10MiB
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+    }
+
+    # No X-Frame-Options: DENY here on purpose. The point of this host is that
+    # someone at Vercel can open it, and a deny would only get in the way if it
+    # is ever embedded in a deck or a preview.
+    reverse_proxy 127.0.0.1:3060 {
+        header_up X-Real-IP {remote_host}
+    }
+}

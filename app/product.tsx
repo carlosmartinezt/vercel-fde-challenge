@@ -4,6 +4,7 @@ import type { Product } from '@/lib/api'
 import Image from 'next/image'
 import * as React from 'react'
 import { generateTryOn } from './actions'
+import { getVariant, type Variant } from './variant'
 import { useTryOn } from './try-on-context'
 
 type TryOnState
@@ -12,23 +13,20 @@ type TryOnState
     | { status: 'error', error: string }
 
 export default function ProductPage({ product, index }: { product: Product, index: number }) {
-  // get random product title per user
-
-  const [title, setTitle] = React.useState('loading...')
+  /**
+   * The copy experiment. Starts on `default` so the prerendered HTML carries
+   * the real product name rather than a placeholder, then swaps to the
+   * visitor's assigned variant after mount. Control-group visitors never see
+   * it change, and the server and first client render agree, so there is no
+   * hydration mismatch.
+   */
+  const [variant, setVariant] = React.useState<Variant>('default')
 
   React.useEffect(() => {
-    async function fetchData() {
-      // check if it exists
-      if (localStorage.getItem(`product-${product.id}-title`) === null) {
-        const randomIndex = Math.floor(Math.random() * 3)
-        const newTitle = randomIndex === 0 ? product.title.a : randomIndex === 1 ? product.title.b : randomIndex === 2 ? product.title.c : product.title.default
-        localStorage.setItem(`product-${product.id}-title`, newTitle)
-      }
-      const newTitle = localStorage.getItem(`product-${product.id}-title`) || product.title.default
-      setTitle(newTitle)
-    }
-    fetchData()
-  }, [product, index])
+    setVariant(getVariant())
+  }, [])
+
+  const title = product.title[variant]
 
   const { photo } = useTryOn()
 
